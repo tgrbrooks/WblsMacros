@@ -3,8 +3,13 @@
 
 #include "Target.h"
 
-std::vector<TString> files = {"gd_h2o_10k", "gd_wbls_1pct", "wbls1pct", "wbls3pct", "wbls5pct"};
+//std::vector<TString> files = {"gd_h2o_10k", "gd_wbls_1pct", "wbls1pct", "wbls3pct", "wbls5pct"};
+std::vector<TString> files = {"gd_water", "wbls_1pc_gd", "wbls_1pc", "wbls_3pc", "wbls_5pc"};
+//std::vector<TString> files = {"gd_h2o_pos", "wbls_1pc_gd_pos", "wbls_1pc_pos", "wbls_3pc_pos", "wbls_5pc_pos"};
+//std::vector<TString> files = {"gd_h2o_tl208", "gd_wbls_1pct_tl208", "wbls1pct_tl208", "wbls3pct_tl208", "wbls5pct_tl208"};
 std::vector<TString> names = {"Gd-H_{2}O", "Gd-WbLS(1%)", "WbLS(1%)", "WbLS(3%)", "WbLS(5%)"};
+//std::vector<TString> names = {"n9", "n100", "seln9", "n400"};
+TString dir = "FitPlots/";
 std::vector<int> colours = {46, 33, 38, 42, 30, 49};
 
 
@@ -15,7 +20,7 @@ void PlotTargets1D(std::vector<Target*> targets, TString variable, int bins, dou
   TCanvas *canvas = new TCanvas(name, name, 900, 600);
   canvas->SetMargin(0.12, 0.07, 0.14, 0.1);
 
-  TLegend *legend = new TLegend(0.12,0.91,0.92,0.98);
+  TLegend *legend = new TLegend(0.18,0.91,0.92,0.98);
 
   THStack *stack = new THStack("hs"+name, "");
   TString xtitle;
@@ -42,7 +47,7 @@ void PlotTargets1D(std::vector<Target*> targets, TString variable, int bins, dou
   canvas->Modified();
   legend->SetNColumns(legend->GetNRows() * legend->GetNColumns());
   legend->Draw("SAME");
-  canvas->SaveAs("FitPlots/"+name+".png");
+  canvas->SaveAs(dir+name+".png");
 
   // clean up
   stack->GetHists()->Delete();
@@ -62,13 +67,60 @@ void PlotTargets2D(std::vector<Target*> targets, TString variable1, int bins1, d
     TH2F* hist = targets[i]->Hist2D(variable1, bins1, min1, max1, variable2, bins2, min2, max2);
 
     hist->Draw("COLZ");
-    canvas->SaveAs("FitPlots/"+name+".png");
+    canvas->SaveAs(dir+name+".png");
 
     // clean up
     delete canvas;
     delete hist;
   }
 } // PlotTargets2D
+
+
+void PlotCuts1D(std::vector<Target*> targets, TString variable, int bins, double min, double max, std::vector<int> scale){
+
+  TString name = variable + "_cut";
+  TCanvas *canvas = new TCanvas(name, name, 900, 600);
+  canvas->SetMargin(0.12, 0.07, 0.14, 0.1);
+
+  TLegend *legend = new TLegend(0.18,0.91,0.92,0.98);
+
+  THStack *stack = new THStack("hs"+name, "");
+  TString xtitle;
+  TString ytitle;
+
+  for(size_t i = 0; i < targets.size(); i++){
+
+    TH1F* hist = targets[i]->Cut1D(variable, bins, min, max);
+    hist->SetLineColor(colours[i]);
+    hist->SetMarkerColor(colours[i]);
+    hist->Scale(1./scale[i]);
+    hist->SetYTitle("Percentage of triggers cut");
+    hist->SetLineWidth(3);
+
+    stack->Add(hist);
+    xtitle = hist->GetXaxis()->GetTitle();
+    ytitle = hist->GetYaxis()->GetTitle();
+
+    legend->AddEntry(hist, names[i], "l");
+  }
+
+  stack->Draw("nostack p E1 x0");
+  stack->GetHistogram()->SetMarkerColor(kWhite);
+  canvas->Update();
+  stack->Draw("nostack Lhist same");
+  stack->GetXaxis()->SetTitle(xtitle);
+  stack->GetYaxis()->SetTitle(ytitle);
+  stack->GetYaxis()->SetRangeUser(0.6, 1);
+  canvas->Modified();
+  legend->SetNColumns(legend->GetNRows() * legend->GetNColumns());
+  legend->Draw("SAME");
+  canvas->SaveAs(dir+name+".png");
+
+  // clean up
+  stack->GetHists()->Delete();
+  delete canvas, legend, stack;
+
+} // PlotTargets1D
 
 
 // Plot the arithmetic mean of a variable as a function of another for all target materials
@@ -78,7 +130,7 @@ void PlotTargetsMeans(std::vector<Target*> targets, TString variable1, int bins,
   TCanvas *canvas = new TCanvas(name, name, 900, 600);
   canvas->SetMargin(0.12, 0.07, 0.14, 0.1);
 
-  TLegend *legend = new TLegend(0.12,0.91,0.92,0.98);
+  TLegend *legend = new TLegend(0.18,0.91,0.92,0.98);
 
   THStack *stack = new THStack("hs"+name, "");
   TString xtitle;
@@ -107,11 +159,45 @@ void PlotTargetsMeans(std::vector<Target*> targets, TString variable1, int bins,
   
   legend->SetNColumns(legend->GetNRows() * legend->GetNColumns());
   legend->Draw("SAME");
-  canvas->SaveAs("FitPlots/"+name+".png");
+  canvas->SaveAs(dir+name+".png");
 
   // clean up
   stack->GetHists()->Delete();
   delete canvas, legend, stack;
+} // PlotTargetsMeans
+
+
+// Plot the cumulative mean of a variable as a function of another for all target materials
+void PlotTargetsCumulative(std::vector<Target*> targets, TString variable1, int bins, double min, double max, TString variable2, double percentage, double error){
+
+  TString name = "cdf_"+variable2+"_vs_" + variable1;
+  TCanvas *canvas = new TCanvas(name, name, 900, 600);
+  canvas->SetMargin(0.12, 0.07, 0.14, 0.1);
+
+  TLegend *legend = new TLegend(0.18,0.91,0.92,0.98);
+
+  bool first = true;
+  for(size_t i = 0; i < targets.size(); i++){
+    TGraphAsymmErrors* graph = targets[i]->Cumulative(variable1, bins, min, max, variable2, percentage, error);
+    graph->SetLineColor(colours[i]);
+    graph->SetMarkerColor(colours[i]);
+    graph->SetLineWidth(3);
+    if (first){
+      graph->Draw("apl");
+      graph->GetYaxis()->SetRangeUser(0, 180);
+      first = false;
+    }
+    else graph->Draw("pl same");
+
+    legend->AddEntry(graph, names[i], "p");
+  }
+  
+  legend->SetNColumns(legend->GetNRows() * legend->GetNColumns());
+  legend->Draw("SAME");
+  canvas->SaveAs(dir+name+".png");
+
+  // clean up
+  delete canvas, legend;
 } // PlotTargetsMeans
 
 
@@ -121,8 +207,8 @@ void PlotTargetsBiasRes(std::vector<Target*> targets, TString variable1, int bin
   TString name = variable2+"_vs_" + variable1;
   THStack *bias_stack = new THStack("bhs"+name, "");
   THStack *res_stack = new THStack("rhs"+name, "");
-  TLegend *bias_legend = new TLegend(0.12,0.91,0.92,0.98);
-  TLegend *res_legend = new TLegend(0.12,0.91,0.92,0.98);
+  TLegend *bias_legend = new TLegend(0.18,0.91,0.92,0.98);
+  TLegend *res_legend = new TLegend(0.18,0.91,0.92,0.98);
   TString bxtitle, bytitle, rxtitle, rytitle;
 
   for(size_t i = 0; i < targets.size(); i++){
@@ -160,7 +246,7 @@ void PlotTargetsBiasRes(std::vector<Target*> targets, TString variable1, int bin
   l_bias->Draw("same");
   bias_legend->SetNColumns(bias_legend->GetNRows() * bias_legend->GetNColumns());
   bias_legend->Draw("same");
-  bias_canvas->SaveAs("FitPlots/"+name+"_bias.png");
+  bias_canvas->SaveAs(dir+name+"_bias.png");
 
   TCanvas *res_canvas = new TCanvas(name+"_res", "", 900, 600);
   res_canvas->SetMargin(0.12, 0.07, 0.14, 0.1);
@@ -174,7 +260,7 @@ void PlotTargetsBiasRes(std::vector<Target*> targets, TString variable1, int bin
 
   res_legend->SetNColumns(res_legend->GetNRows() * res_legend->GetNColumns());
   res_legend->Draw("same");
-  res_canvas->SaveAs("FitPlots/"+name+"_resolution.png");
+  res_canvas->SaveAs(dir+name+"_resolution.png");
 
   // clean up
   bias_stack->GetHists()->Delete();
@@ -183,12 +269,53 @@ void PlotTargetsBiasRes(std::vector<Target*> targets, TString variable1, int bin
 } // PlotTargetsBiasRes
 
 
+// Plot the bias and resolution (from Gaussian fits to binned distributions) of one variable in terms of another for all target materials
+void PlotTargetsFraction(std::vector<Target*> targets, TString variable1, double min1, TString variable2, int bins, double min2, double max2){
+
+  TString name = variable2+"_vs_" + variable1;
+  THStack *stack = new THStack("fhs"+name, "");
+  TLegend *legend = new TLegend(0.18,0.91,0.92,0.98);
+  TString xtitle, ytitle;
+
+  for(size_t i = 0; i < targets.size(); i++){
+    TH1F* pass = targets[i]->Fraction(variable1, min1, variable2, bins, min2, max2);
+
+    pass->SetLineColor(colours[i]);
+    pass->SetMarkerColor(colours[i]);
+    pass->SetMarkerSize(2);
+    pass->SetLineWidth(3);
+    stack->Add(pass);
+    legend->AddEntry(pass, names[i], "p");
+    xtitle = pass->GetXaxis()->GetTitle();
+    ytitle = pass->GetYaxis()->GetTitle();
+
+  }
+
+  TCanvas *canvas = new TCanvas(name+"_frac", "", 900, 600);
+  canvas->SetMargin(0.12, 0.07, 0.14, 0.1);
+  stack->Draw("nostack p");
+  stack->GetHistogram()->SetMarkerColor(kWhite);
+  canvas->Update();
+  stack->Draw("nostack Lhist same");
+  stack->GetXaxis()->SetTitle(xtitle);
+  stack->GetYaxis()->SetTitle(ytitle);
+  canvas->Modified();
+  legend->SetNColumns(legend->GetNRows() * legend->GetNColumns());
+  legend->Draw("same");
+  canvas->SaveAs(dir+name+"_frac.png");
+
+  // clean up
+  stack->GetHists()->Delete();
+  delete canvas, legend, stack;
+} // PlotTargetsBiasRes
+
+
 // Plot the mean and standard deviation of a gaussian fit of one variable binned in another for all target materials
 void PlotTargetsMeanFit(std::vector<Target*> targets, TString variable1, int bins1, double min1, double max1, TString variable2, int bins2, double min2, double max2){
 
   TString name = "mean_fit_"+variable2+"_vs_" + variable1;
   THStack *stack = new THStack("hs"+name, "");
-  TLegend *legend = new TLegend(0.12,0.91,0.92,0.98);
+  TLegend *legend = new TLegend(0.18,0.91,0.92,0.98);
   TString xtitle, ytitle;
 
   for(size_t i = 0; i < targets.size(); i++){
@@ -221,7 +348,7 @@ void PlotTargetsMeanFit(std::vector<Target*> targets, TString variable1, int bin
 
   legend->SetNColumns(legend->GetNRows() * legend->GetNColumns());
   legend->Draw("same");
-  canvas->SaveAs("FitPlots/"+name+".png");
+  canvas->SaveAs(dir+name+".png");
 
   // clean up
   stack->GetHists()->Delete();
@@ -238,7 +365,7 @@ void PlotFitters1D(std::vector<Target*> targets, TString variable, int bins, dou
     TCanvas *canvas = new TCanvas(name, name, 900, 600);
     canvas->SetMargin(0.12, 0.07, 0.14, 0.1);
 
-    TLegend *legend = new TLegend(0.12,0.91,0.92,0.98);
+    TLegend *legend = new TLegend(0.18,0.91,0.92,0.98);
 
     THStack *stack = new THStack("hs"+name, "");
 
@@ -264,7 +391,7 @@ void PlotFitters1D(std::vector<Target*> targets, TString variable, int bins, dou
     canvas->Modified();
     legend->SetNColumns(legend->GetNRows() * legend->GetNColumns());
     legend->Draw("SAME");
-    canvas->SaveAs("FitPlots/"+name+".png");
+    canvas->SaveAs(dir+name+".png");
 
     // clean up
     delete canvas, legend, bhist, chist, stack;
@@ -279,7 +406,7 @@ void PlotFittersMeans(Target* target, int i, TString variable1, int bins, double
   TCanvas *canvas = new TCanvas(name, name, 900, 600);
   canvas->SetMargin(0.12, 0.07, 0.14, 0.1);
 
-  TLegend *legend = new TLegend(0.12,0.91,0.92,0.98);
+  TLegend *legend = new TLegend(0.18,0.91,0.92,0.98);
 
   THStack *stack = new THStack("hs"+name, "");
 
@@ -306,7 +433,7 @@ void PlotFittersMeans(Target* target, int i, TString variable1, int bins, double
   canvas->Modified();
   legend->SetNColumns(legend->GetNRows() * legend->GetNColumns());
   legend->Draw("SAME");
-  canvas->SaveAs("FitPlots/"+name+".png");
+  canvas->SaveAs(dir+name+".png");
 
   // clean up
   delete canvas, legend, bhist, chist, stack;
@@ -329,7 +456,7 @@ void PlotFittersCumulative(Target* target, int i, TString variable1, int bins, d
   TCanvas *canvas = new TCanvas(name, name, 900, 600);
   canvas->SetMargin(0.12, 0.07, 0.14, 0.1);
 
-  TLegend *legend = new TLegend(0.12,0.91,0.92,0.98);
+  TLegend *legend = new TLegend(0.18,0.91,0.92,0.98);
 
   TGraphAsymmErrors* bgraph = target->Cumulative(variable1, bins, min, max, "bonsai_"+variable2, percentage, error);
   bgraph->SetLineColor(colours[0]);
@@ -344,10 +471,11 @@ void PlotFittersCumulative(Target* target, int i, TString variable1, int bins, d
   legend->AddEntry(cgraph, "centroid", "p");
 
   bgraph->Draw("apl");
+  //bgraph->GetYaxis()->SetRangeUser(0, 3);
   cgraph->Draw("pl same");
   legend->SetNColumns(legend->GetNRows() * legend->GetNColumns());
   legend->Draw("SAME");
-  canvas->SaveAs("FitPlots/"+name+".png");
+  canvas->SaveAs(dir+name+".png");
 
   // clean up
   delete canvas, legend, bgraph, cgraph;
@@ -369,8 +497,8 @@ void PlotFittersBiasRes(Target* target, int i, TString variable1, int bins1, dou
   TString name = variable2+"_vs_" + variable1+"_"+files[i];
   THStack *bias_stack = new THStack("bhs"+name, "");
   THStack *res_stack = new THStack("rhs"+name, "");
-  TLegend *bias_legend = new TLegend(0.12,0.91,0.92,0.98);
-  TLegend *res_legend = new TLegend(0.12,0.91,0.92,0.98);
+  TLegend *bias_legend = new TLegend(0.18,0.91,0.92,0.98);
+  TLegend *res_legend = new TLegend(0.18,0.91,0.92,0.98);
 
   std::pair<TH1F*, TH1F*> bbias_res = target->BiasRes(variable1, bins1, min1, max1, "bonsai_"+variable2, bins2, min2, max2);
 
@@ -415,7 +543,7 @@ void PlotFittersBiasRes(Target* target, int i, TString variable1, int bins1, dou
   l_bias->Draw("same");
   bias_legend->SetNColumns(bias_legend->GetNRows() * bias_legend->GetNColumns());
   bias_legend->Draw("same");
-  bias_canvas->SaveAs("FitPlots/"+name+"_bias.png");
+  bias_canvas->SaveAs(dir+name+"_bias.png");
 
   TCanvas *res_canvas = new TCanvas(name+"_res", "", 900, 600);
   res_canvas->SetMargin(0.12, 0.07, 0.14, 0.1);
@@ -429,7 +557,7 @@ void PlotFittersBiasRes(Target* target, int i, TString variable1, int bins1, dou
 
   res_legend->SetNColumns(res_legend->GetNRows() * res_legend->GetNColumns());
   res_legend->Draw("same");
-  res_canvas->SaveAs("FitPlots/"+name+"_resolution.png");
+  res_canvas->SaveAs(dir+name+"_resolution.png");
 
   // clean up
   delete bias_canvas, bias_legend, res_canvas, res_legend, bbias_res.first, bbias_res.second, cbias_res.first, cbias_res.second, bias_stack, res_stack;//, l_bias;
@@ -452,7 +580,7 @@ void PlotFittersMeanFit(Target* target, int i, TString variable1, int bins1, dou
 
   TString name = variable2+"_vs_" + variable1 + "_" + files[i];
   THStack *stack = new THStack("hs"+name, "");
-  TLegend *legend = new TLegend(0.12,0.91,0.92,0.98);
+  TLegend *legend = new TLegend(0.18,0.91,0.92,0.98);
 
   std::pair<TH1F*, TH1F*> bonsai = target->BiasRes(variable1, bins1, min1, max1, "bonsai_"+variable2, bins2, min2, max2);
 
@@ -489,7 +617,7 @@ void PlotFittersMeanFit(Target* target, int i, TString variable1, int bins1, dou
 
   legend->SetNColumns(legend->GetNRows() * legend->GetNColumns());
   legend->Draw("same");
-  canvas->SaveAs("FitPlots/"+name+".png");
+  canvas->SaveAs(dir+name+".png");
 
   // clean up
   delete canvas, legend, bonsai.first, bonsai.second, centroid.first, centroid.second, stack;

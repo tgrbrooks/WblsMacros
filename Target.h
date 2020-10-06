@@ -35,6 +35,7 @@ class Target
   std::vector<double> bonsai_v;
   std::vector<double> bonsai_w;
   std::vector<double> n9;
+  std::vector<double> good_dir;
   std::vector<double> centroid_x;
   std::vector<double> centroid_y;
   std::vector<double> centroid_z;
@@ -52,6 +53,8 @@ class Target
     labels["mc_u"] = "Dir X^{mc}";
     labels["mc_v"] = "Dir Y^{mc}";
     labels["mc_w"] = "Dir Z^{mc}";
+    labels["mc_theta"] = "Dir #theta^{mc} [deg]";
+    labels["mc_phi"] = "Dir #phi^{mc} [deg]";
     labels["mc_wall"] = "Distance to Wall^{mc} [m]";
     labels["mc_r"] = "R^{mc} [m]";
     labels["mc_angle"] = "#theta^{mc} [deg]";
@@ -72,6 +75,10 @@ class Target
     labels["bonsai_u"] = "Dir X^{bonsai}";
     labels["bonsai_v"] = "Dir Y^{bonsai}";
     labels["bonsai_w"] = "Dir Z^{bonsai}";
+    labels["bonsai_theta"] = "Dir #theta^{bonsai} [deg]";
+    labels["bonsai_dtheta"] = "#Delta Dir #theta^{bonsai-mc} [deg]";
+    labels["bonsai_phi"] = "Dir #phi^{bonsai} [deg]";
+    labels["bonsai_dphi"] = "#Delta Dir #phi^{bonsai-mc} [deg]";
     labels["bonsai_wall"] = "Distance to Wall^{bonsai} [m]";
     labels["bonsai_dwall"] = "#Delta Distance to Wall^{bonsai-mc} [m]";
     labels["bonsai_r"] = "R^{bonsai} [m]";
@@ -82,10 +89,11 @@ class Target
     labels["bonsai_dv"] = "#Delta Dir Y^{bonsai-mc} [m]";
     labels["bonsai_dw"] = "#Delta Dir Z^{bonsai-mc} [m]";
     labels["bonsai_dr"] = "#Delta R^{bonsai-mc} [m]";
-    labels["bonsai_dangle"] = "#Delta #theta^{bonsai-mc} [m]";
+    labels["bonsai_dangle"] = "#Delta #theta^{bonsai-mc} [deg]";
     labels["bonsai_dist"] = "Vertex Distance^{bonsai-mc} [m]";
     labels["bonsai_angle"] = "#theta^{bonsai} [deg]";
     labels["n9"] = "N9";
+    labels["good_dir"] = "Direction Goodness";
     labels["centroid_x"] = "X^{centroid} [m]";
     labels["centroid_y"] = "Y^{centroid} [m]";
     labels["centroid_z"] = "Z^{centroid} [m]";
@@ -99,6 +107,14 @@ class Target
     labels["centroid_dr"] = "#Delta R^{centroid-mc} [m]";
     labels["centroid_dangle"] = "#Delta #theta^{centroid-mc} [m]";
     labels["centroid_dist"] = "Vertex Distance^{centroid-mc} [m]";
+  }
+
+  void SetBoundR(double r){
+    pmt_bound_R = r;
+  }
+
+  void SetBoundZ(double z){
+    pmt_bound_Z = z;
   }
 
   double Distance(int i, TString fitter){
@@ -160,11 +176,31 @@ class Target
     TVector3 unit(bonsai_u[i], bonsai_v[i], bonsai_w[i]);
     return mc_unit.Angle(unit)*180./TMath::Pi();
   }
+
+  double DirTheta(int i, TString fitter="none"){
+    if(i >= mc_x.size() || i < 0) return -99999;
+    if(fitter == "bonsai"){
+      double r = sqrt(std::pow(bonsai_u[i],2)+std::pow(bonsai_v[i],2)+std::pow(bonsai_w[i],2));
+      return std::acos(bonsai_w[i]/r)*180./TMath::Pi();
+    }
+    double r = sqrt(std::pow(mc_u[i],2)+std::pow(mc_v[i],2)+std::pow(mc_w[i],2));
+    return std::acos(mc_w[i]/r)*180./TMath::Pi();
+  }
+
+  double DirPhi(int i, TString fitter="none"){
+    if(i >= mc_x.size() || i < 0) return -99999;
+    if(fitter == "bonsai"){
+      return std::atan2(bonsai_v[i], bonsai_u[i])*180./TMath::Pi();
+    }
+    return std::atan2(mc_v[i], mc_u[i])*180./TMath::Pi();
+  }
   
   double Diff(int i, TString variable1, TString variable2){
     if(i >= mc_x.size() || i < 0) return -99999;
     if(Get(i, variable1) <= -99999 || Get(i, variable2) <= -99999) return -99999;
-    if(variable1.Contains("angle") && variable2.Contains("angle")){
+    if((variable1.Contains("angle") && variable2.Contains("angle")) ||
+       (variable1.Contains("theta") && variable2.Contains("theta")) ||
+       (variable1.Contains("phi") && variable2.Contains("phi"))){
       double a1 = Get(i, variable1)*TMath::Pi()/180.;
       double a2 = Get(i, variable2)*TMath::Pi()/180.;
       return std::atan2(std::sin(a1-a2), std::cos(a1-a2))*180./TMath::Pi();
@@ -192,6 +228,8 @@ class Target
     if(variable == "mc_u") return mc_u[i];
     if(variable == "mc_v") return mc_v[i];
     if(variable == "mc_w") return mc_w[i];
+    if(variable == "mc_theta") return DirTheta(i);
+    if(variable == "mc_phi") return DirPhi(i);
     if(variable == "mc_wall") return WallDist(i);
     if(variable == "mc_r") return Radius(i);
     if(variable == "mc_angle") return Angle(i);
@@ -212,6 +250,10 @@ class Target
     if(variable == "bonsai_u") return bonsai_u[i];
     if(variable == "bonsai_v") return bonsai_v[i];
     if(variable == "bonsai_w") return bonsai_w[i];
+    if(variable == "bonsai_theta") return DirTheta(i, "bonsai");
+    if(variable == "bonsai_dtheta") return Diff(i, "bonsai_theta", "mc_theta");
+    if(variable == "bonsai_phi") return DirPhi(i, "bonsai");
+    if(variable == "bonsai_dphi") return Diff(i, "bonsai_phi", "mc_phi");
     if(variable == "bonsai_wall") return WallDist(i, "bonsai");
     if(variable == "bonsai_r") return Radius(i, "bonsai");
     if(variable == "bonsai_angle") return Angle(i, "bonsai");
@@ -224,6 +266,7 @@ class Target
     if(variable == "bonsai_dangle") return Diff(i, "bonsai_angle", "mc_angle");
     if(variable == "bonsai_dist") return Distance(i, "bonsai");
     if(variable == "n9") return n9[i];
+    if(variable == "good_dir") return good_dir[i];
     if(variable == "centroid_x") return centroid_x[i];
     if(variable == "centroid_y") return centroid_y[i];
     if(variable == "centroid_z") return centroid_z[i];
@@ -250,6 +293,39 @@ class Target
     return hist;
   }
 
+  std::pair<double, double> FitHist1D(TString variable, int bins, double min, double max){
+    TH1F *hist = new TH1F("fithist1d"+name+variable, "", bins, min, max);
+    for(size_t i = 0; i < mc_x.size(); i++){
+      hist->Fill(Get(i, variable));
+    }
+    TF1 *gaus = new TF1("mg", "gaus", min, max);
+    hist->Fit(gaus, "RQE");
+    double bias = gaus->GetParameter(1);
+    double res = gaus->GetParameter(2);
+    delete hist;
+    return std::make_pair(bias, res);
+  }
+
+  double Count(TString variable, double max){
+    int count = 0;
+    for(size_t i = 0; i < mc_x.size(); i++){
+      double var = Get(i, variable);
+      if(var < max){
+        count++;
+      }
+    }
+    return count;
+  }
+
+  TH1F* Cut1D(TString variable, int bins, double min, double max){
+    TH1F *hist = new TH1F("cut1d"+name+variable, "", bins, min, max);
+    for(size_t i = 0; i < bins; i++){
+      double cut = min + (i+0.5)*(max - min)/bins;
+      hist->SetBinContent(i+1, Count(variable, cut));
+    }
+    hist->SetXTitle("Cut on "+labels[variable]);
+    return hist;
+  }
 
   TH2F* Hist2D(TString variable1, int bins1, double min1, double max1, TString variable2, int bins2, double min2, double max2){
     TH2F *hist = new TH2F("hist2d"+name+variable1+variable2, "", bins1, min1, max1, bins2, min2, max2);
@@ -293,20 +369,44 @@ class Target
   }
 
 
-  std::pair<double, double> MeanStd(TString variable){
+  TH1F* Fraction(TString variable1, double min1, TString variable2, int bins, double min2, double max2){
+
+    TH1F* pass = new TH1F("pass"+name+variable1+variable2, "", bins, min2, max2);
+    pass->GetXaxis()->SetTitle(labels[variable2]);
+    pass->GetYaxis()->SetTitle("Fraction with "+labels[variable1]+" > 9");
+
+    TH1F* tot = new TH1F("fail"+name+variable1+variable2, "", bins, min2, max2);
+
+    for(size_t i = 0; i < mc_x.size(); i++){
+      double var1 = Get(i, variable1);
+      double var2 = Get(i, variable2);
+      if(var1 <= -99999) continue;
+      if(var1 > min1) pass->Fill(var2);
+      tot->Fill(var2);
+    }
+    pass->Divide(tot);
+    return pass;
+  }
+
+
+  std::pair<double, double> MeanStd(TString variable, double min=0, double max=0){
 
     double mean = 0;
     int count = 0;
     for(size_t i = 0; i < mc_x.size(); i++){
-      if(Get(i, variable) <= -99999) continue;
-      mean += Get(i, variable);
+      double var = Get(i, variable);
+      if(var <= -99999) continue;
+      if(min != 0 && max != 0 && (var < min || var > max)) continue;
+      mean += var;
       count++;
     }
     mean /= count;
     double std_dev = 0;
     for(size_t i = 0; i < mc_x.size(); i++){
-      if(Get(i, variable) <= -99999) continue;
-      std_dev += std::pow(Get(i, variable) - mean, 2);
+      double var = Get(i, variable);
+      if(var <= -99999) continue;
+      if(min != 0 && max != 0 && (var < min || var > max)) continue;
+      std_dev += std::pow(var - mean, 2);
     }
     std_dev = std::sqrt(std_dev/(count-1));
     return std::make_pair(mean, std_dev);
@@ -377,6 +477,7 @@ class Target
           vals.push_back(v2);
         }
       }
+      if(vals.size()==0) continue;
       std::sort(vals.begin(), vals.end());
       int entry = std::floor(percent*vals.size());
       int entry_min = std::floor((percent-err)*vals.size());
@@ -385,7 +486,6 @@ class Target
       y.push_back(vals[entry]);
       ey_min.push_back(vals[entry]-vals[entry_min]);
       ey_max.push_back(vals[entry_max]-vals[entry]);
-      //std::cout<<"bin "<<b<<" size = "<<vals.size()<<" entry = "<<entry<<" value = "<<vals[entry]<<"\n";
     }
     std::vector<double> empty(0, x.size());
     TGraphAsymmErrors *graph = new TGraphAsymmErrors(x.size(), &x[0], &y[0], &empty[0], &empty[0], &ey_min[0], &ey_max[0]);
